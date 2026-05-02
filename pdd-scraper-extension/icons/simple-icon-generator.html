@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>一键生成插件图标</title>
+  <style>
+    body {
+      font-family: 'Microsoft YaHei', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      text-align: center;
+      max-width: 500px;
+    }
+    h1 {
+      color: #ff4400;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .icons-preview {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+    .icon-preview {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .icon-box {
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ff6b35, #ff4400);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(255, 68, 0, 0.4);
+    }
+    .icon-box svg {
+      fill: white;
+    }
+    .icon-label {
+      font-size: 13px;
+      color: #666;
+    }
+    .btn {
+      background: linear-gradient(135deg, #ff6b35, #ff4400);
+      color: white;
+      border: none;
+      padding: 16px 40px;
+      font-size: 18px;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(255, 68, 0, 0.4);
+      font-family: 'Microsoft YaHei', Arial, sans-serif;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 68, 0, 0.5);
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+    .instructions {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      text-align: left;
+    }
+    .instructions h3 {
+      color: #ff4400;
+      margin-top: 0;
+      font-size: 16px;
+    }
+    .instructions ol {
+      margin: 0;
+      padding-left: 20px;
+      line-height: 1.8;
+      color: #555;
+    }
+    .success-message {
+      display: none;
+      margin-top: 20px;
+      padding: 15px;
+      background: #e8f5e9;
+      border-radius: 8px;
+      color: #2e7d32;
+      font-size: 14px;
+    }
+    .success-message.show {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>拼多多商品采集助手</h1>
+    <p class="subtitle">一键生成所有需要的图标文件</p>
+    
+    <div class="icons-preview">
+      <div class="icon-preview">
+        <div class="icon-box" style="width: 64px; height: 64px;">
+          <svg width="32" height="32" viewBox="0 0 24 24">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+          </svg>
+        </div>
+        <span class="icon-label">128x128</span>
+      </div>
+      <div class="icon-preview">
+        <div class="icon-box" style="width: 48px; height: 48px;">
+          <svg width="24" height="24" viewBox="0 0 24 24">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+          </svg>
+        </div>
+        <span class="icon-label">48x48</span>
+      </div>
+      <div class="icon-preview">
+        <div class="icon-box" style="width: 32px; height: 32px;">
+          <svg width="16" height="16" viewBox="0 0 24 24">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+          </svg>
+        </div>
+        <span class="icon-label">16x16</span>
+      </div>
+    </div>
+    
+    <button class="btn" id="generateBtn">一键生成并下载所有图标</button>
+    
+    <div class="success-message" id="successMessage">
+      ✅ 图标已下载！请将下载的图标文件放入 <strong>icons</strong> 文件夹中，然后重新加载插件。
+    </div>
+    
+    <div class="instructions">
+      <h3>使用步骤</h3>
+      <ol>
+        <li>点击上方的"一键生成并下载所有图标"按钮</li>
+        <li>浏览器会自动下载3个PNG图标文件</li>
+        <li>将下载的图标文件移动到插件的 <strong>icons</strong> 文件夹中</li>
+        <li>确保文件名分别为：icon128.png、icon48.png、icon16.png</li>
+        <li>在Chrome扩展管理页面重新加载插件</li>
+      </ol>
+    </div>
+  </div>
+  
+  <script>
+    function drawIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+      canvas.width = size;
+      canvas.height = size;
+      
+      const gradient = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+      gradient.addColorStop(0, '#ff6b35');
+      gradient.addColorStop(1, '#ff4400');
+      
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = 'white';
+      const iconSize = size * 0.5;
+      const offsetX = (size - iconSize) / 2;
+      const offsetY = (size - iconSize) / 2;
+      
+      ctx.beginPath();
+      ctx.moveTo(offsetX + iconSize * 0.79, offsetY + iconSize * 0.38);
+      ctx.lineTo(offsetX + iconSize * 0.62, offsetY + iconSize * 0.38);
+      ctx.lineTo(offsetX + iconSize * 0.62, offsetY + iconSize * 0.13);
+      ctx.lineTo(offsetX + iconSize * 0.38, offsetY + iconSize * 0.13);
+      ctx.lineTo(offsetX + iconSize * 0.38, offsetY + iconSize * 0.38);
+      ctx.lineTo(offsetX + iconSize * 0.21, offsetY + iconSize * 0.38);
+      ctx.lineTo(offsetX + iconSize * 0.5, offsetY + iconSize * 0.67);
+      ctx.lineTo(offsetX + iconSize * 0.79, offsetY + iconSize * 0.38);
+      ctx.closePath();
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.rect(offsetX + iconSize * 0.21, offsetY + iconSize * 0.75, iconSize * 0.58, iconSize * 0.08);
+      ctx.fill();
+    }
+    
+    function downloadIcon(size, filename) {
+      const canvas = document.createElement('canvas');
+      drawIcon(canvas, size);
+      
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    
+    document.getElementById('generateBtn').addEventListener('click', function() {
+      setTimeout(() => downloadIcon(128, 'icon128.png'), 100);
+      setTimeout(() => downloadIcon(48, 'icon48.png'), 300);
+      setTimeout(() => downloadIcon(16, 'icon16.png'), 500);
+      
+      document.getElementById('successMessage').classList.add('show');
+    });
+  </script>
+</body>
+</html>
