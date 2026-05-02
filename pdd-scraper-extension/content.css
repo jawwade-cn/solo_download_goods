@@ -1,0 +1,114 @@
+/* 悬浮按钮样式 */
+#pdd-scraper-float-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff6b35, #ff4400);
+  box-shadow: 0 4px 12px rgba(255, 68, 0, 0.4);
+  cursor: pointer;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+
+#pdd-scraper-float-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(255, 68, 0, 0.5);
+}
+
+#pdd-scraper-float-btn:active {
+  transform: scale(0.95);
+}
+
+/* 按钮图标 */
+#pdd-scraper-float-btn .icon {
+  width: 24px;
+  height: 24px;
+  fill: white;
+}
+
+/* 采集状态提示 */
+#pdd-scraper-float-btn .status {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+#pdd-scraper-float-btn.show-status .status {
+  opacity: 1;
+}
+
+/* 加载动画 */
+#pdd-scraper-float-btn.loading {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* 成功状态 */
+#pdd-scraper-float-btn.success {
+  background: linear-gradient(135deg, #4caf50, #45a049);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+/* 失败状态 */
+#pdd-scraper-float-btn.error {
+  background: linear-gradient(135deg, #f44336, #d32f2f);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+}
+
+/* 采集进度提示框 */
+#pdd-scraper-progress {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 999999;
+  display: none;
+  max-width: 250px;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+#pdd-scraper-progress.show {
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

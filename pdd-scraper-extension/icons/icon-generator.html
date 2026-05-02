@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拼多多采集助手图标生成器</title>
+  <style>
+    body {
+      font-family: 'Microsoft YaHei', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f5f5f5;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .icon-container {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+    .icon-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .icon {
+      background: linear-gradient(135deg, #ff6b35, #ff4400);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(255, 68, 0, 0.4);
+    }
+    .icon svg {
+      fill: white;
+    }
+    .label {
+      font-size: 14px;
+      color: #666;
+    }
+    .instructions {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 500px;
+      text-align: center;
+    }
+    .instructions h3 {
+      margin-top: 0;
+      color: #ff4400;
+    }
+    .instructions ol {
+      text-align: left;
+      line-height: 1.8;
+    }
+  </style>
+</head>
+<body>
+  <h1>拼多多商品采集助手图标</h1>
+  
+  <div class="icon-container">
+    <div class="icon-box">
+      <div class="icon" style="width: 128px; height: 128px;">
+        <svg width="64" height="64" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+        </svg>
+      </div>
+      <span class="label">128x128 (icon128.png)</span>
+    </div>
+    
+    <div class="icon-box">
+      <div class="icon" style="width: 48px; height: 48px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+        </svg>
+      </div>
+      <span class="label">48x48 (icon48.png)</span>
+    </div>
+    
+    <div class="icon-box">
+      <div class="icon" style="width: 16px; height: 16px;">
+        <svg width="8" height="8" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+        </svg>
+      </div>
+      <span class="label">16x16 (icon16.png)</span>
+    </div>
+  </div>
+  
+  <div class="instructions">
+    <h3>如何使用这些图标</h3>
+    <ol>
+      <li>使用截图工具分别截取这三个图标</li>
+      <li>确保截图尺寸精确：128x128、48x48、16x16像素</li>
+      <li>将截图保存为PNG格式，命名为：icon128.png、icon48.png、icon16.png</li>
+      <li>将这三个图标文件放入此文件夹中</li>
+      <li>或者，您也可以使用任何其他图标，只要尺寸和文件名正确即可</li>
+    </ol>
+    <p style="margin-top: 15px; color: #666; font-size: 14px;">
+      <strong>提示：</strong>如果您暂时没有图标，也可以直接加载扩展，Chrome会使用默认图标。
+    </p>
+  </div>
+</body>
+</html>
