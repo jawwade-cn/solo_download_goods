@@ -11,7 +11,9 @@
   ],
   "host_permissions": [
     "https://*.pinduoduo.com/*",
-    "https://*.pddpic.com/*"
+    "https://*.yangkeduo.com/*",
+    "https://*.pddpic.com/*",
+    "https://*.pdd.net/*"
   ],
   "action": {
     "default_popup": "popup.html"
@@ -19,8 +21,9 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.pinduoduo.com/goods.html*",
-        "https://mobile.pinduoduo.com/goods.html*"
+        "https://*.pinduoduo.com/*",
+        "https://*.yangkeduo.com/*",
+        "https://mobile.pinduoduo.com/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"],

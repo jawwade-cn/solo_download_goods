@@ -5,10 +5,22 @@
   let progressDiv = null;
   let isScraping = false;
   
+  const DEBUG = true;
+  
+  function log(message, data) {
+    if (DEBUG) {
+      if (data) {
+        console.log('[拼多多采集助手] ' + message, data);
+      } else {
+        console.log('[拼多多采集助手] ' + message);
+      }
+    }
+  }
+  
   function init() {
     createFloatButton();
     createProgressDiv();
-    console.log('拼多多商品采集助手已初始化');
+    log('已初始化，等待用户点击采集');
   }
   
   function createFloatButton() {
@@ -43,6 +55,7 @@
   function showProgress(message) {
     progressDiv.textContent = message;
     progressDiv.classList.add('show');
+    log(message);
   }
   
   function hideProgress() {
@@ -52,7 +65,10 @@
   }
   
   async function handleScrape() {
-    if (isScraping) return;
+    if (isScraping) {
+      log('正在采集中，请勿重复点击');
+      return;
+    }
     
     isScraping = true;
     floatBtn.classList.add('loading');
@@ -60,8 +76,9 @@
     
     try {
       const productInfo = await scrapeProductInfo();
+      log('采集到的商品信息:', productInfo);
       
-      if (productInfo) {
+      if (productInfo && (productInfo.productName || productInfo.price || productInfo.mainImage)) {
         showProgress('采集成功！正在保存数据...');
         
         await saveProductData(productInfo);
@@ -75,10 +92,17 @@
           hideProgress();
         }, 3000);
       } else {
-        throw new Error('未能采集到商品信息');
+        showProgress('⚠️ 部分信息未采集到，请检查页面是否完全加载');
+        floatBtn.classList.remove('loading');
+        floatBtn.classList.add('error');
+        
+        setTimeout(function() {
+          floatBtn.classList.remove('error');
+          hideProgress();
+        }, 5000);
       }
     } catch (error) {
-      console.error('采集失败:', error);
+      log('采集失败:', error);
       floatBtn.classList.remove('loading');
       floatBtn.classList.add('error');
       showProgress('✗ 采集失败: ' + error.message);
@@ -104,8 +128,13 @@
       mainImage: '',
       images: [],
       shopName: '',
-      scrapedAt: new Date().toISOString()
+      scrapedAt: new Date().toISOString(),
+      sourceUrl: window.location.href
     };
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    log('开始从多种数据源提取信息...');
     
     productInfo.productName = extractProductName();
     productInfo.price = extractPrice();
@@ -117,225 +146,415 @@
     productInfo.images = extractImages();
     productInfo.shopName = extractShopName();
     
-    console.log('采集到的商品信息:', productInfo);
+    if (!productInfo.productName || !productInfo.price) {
+      log('尝试从页面JavaScript变量中提取数据...');
+      const jsData = extractFromJavaScript();
+      if (jsData) {
+        if (!productInfo.productName && jsData.productName) {
+          productInfo.productName = jsData.productName;
+        }
+        if (!productInfo.price && jsData.price) {
+          productInfo.price = jsData.price;
+        }
+        if (!productInfo.mainImage && jsData.mainImage) {
+          productInfo.mainImage = jsData.mainImage;
+        }
+        if (!productInfo.images.length && jsData.images && jsData.images.length) {
+          productInfo.images = jsData.images;
+        }
+      }
+    }
+    
     return productInfo;
   }
   
   function getGoodsIdFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('goods_id') || 'unknown';
+    const goodsId = urlParams.get('goods_id');
+    if (goodsId) {
+      log('从URL获取到商品ID:', goodsId);
+      return goodsId;
+    }
+    
+    const urlMatch = window.location.href.match(/goods_id=(\d+)/);
+    if (urlMatch) {
+      log('从正则匹配获取到商品ID:', urlMatch[1]);
+      return urlMatch[1];
+    }
+    
+    return 'unknown';
   }
   
   function extractProductName() {
+    log('开始提取商品名称...');
+    
     const selectors = [
-      '.goods-title',
-      '.title',
-      '[class*="title"]',
       '[class*="goods-title"]',
+      '[class*="goodsTitle"]',
+      '[class*="good-title"]',
+      '[class*="goodTitle"]',
+      '[class*="product-title"]',
+      '[class*="productTitle"]',
+      '.title',
+      '[data-title]',
+      '[class*="title"]',
       'h1',
       'h2'
     ];
     
     for (const selector of selectors) {
-      const elements = document.querySelectorAll(selector);
-      for (const el of elements) {
-        const text = el.textContent.trim();
-        if (text && text.length > 5 && text.length < 200) {
-          return text.replace(/[\n\r]/g, ' ');
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const text = el.textContent.trim();
+          if (text && text.length > 5 && text.length < 200) {
+            if (!text.includes('￥') && !text.includes('¥') && !text.match(/^\d+(\.\d+)?$/)) {
+              log('从选择器"' + selector + '"提取到商品名称:', text.substring(0, 50));
+              return text.replace(/[\n\r]/g, ' ').replace(/\s+/g, ' ');
+            }
+          }
         }
+      } catch (e) {
+        log('选择器' + selector + '执行失败:', e);
       }
     }
     
+    const allTexts = [];
+    const allElements = document.querySelectorAll('*');
+    for (const el of allElements) {
+      try {
+        const text = el.textContent.trim();
+        if (text && text.length > 10 && text.length < 150) {
+          if (!text.includes('￥') && !text.includes('¥') && !text.includes('已拼') && !text.includes('件')) {
+            if (!text.includes('收藏') && !text.includes('关注') && !text.includes('客服')) {
+              allTexts.push({ text: text, length: text.length });
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    
+    allTexts.sort((a, b) => b.length - a.length);
+    if (allTexts.length > 0) {
+      log('从页面文本中找到最可能的商品名称:', allTexts[0].text.substring(0, 50));
+      return allTexts[0].text.replace(/[\n\r]/g, ' ').replace(/\s+/g, ' ');
+    }
+    
+    log('未能提取到商品名称');
     return '';
   }
   
   function extractPrice() {
-    const selectors = [
-      '[class*="price"]',
-      '[class*="Price"]',
-      '.price',
-      '.Price'
+    log('开始提取价格...');
+    
+    const patterns = [
+      /[￥¥](\d+\.?\d*)/g,
+      /价格[：:]\s*[￥¥]?(\d+\.?\d*)/,
+      /现价[：:]\s*[￥¥]?(\d+\.?\d*)/,
+      /(\d+\.?\d*)\s*元/,
+      /(\d+\.?\d*)\s*券后价/,
+      /(\d+\.?\d*)\s*起/
     ];
     
-    for (const selector of selectors) {
-      const elements = document.querySelectorAll(selector);
-      for (const el of elements) {
-        const text = el.textContent.trim();
-        const priceMatch = text.match(/(\d+\.?\d*)/);
-        if (priceMatch && parseFloat(priceMatch[1]) > 0) {
-          return priceMatch[1];
+    const allText = document.body.innerText;
+    
+    for (const pattern of patterns) {
+      if (pattern.global) {
+        const matches = [...allText.matchAll(pattern)];
+        for (const match of matches) {
+          const price = parseFloat(match[1]);
+          if (price > 0 && price < 100000) {
+            log('从文本中提取到价格:', price);
+            return String(price);
+          }
+        }
+      } else {
+        const match = allText.match(pattern);
+        if (match) {
+          const price = parseFloat(match[1]);
+          if (price > 0 && price < 100000) {
+            log('从文本中提取到价格:', price);
+            return String(price);
+          }
         }
       }
     }
     
+    const selectors = [
+      '[class*="price"]',
+      '[class*="Price"]',
+      '[class*="pdd-price"]',
+      '[class*="pddPrice"]',
+      '[class*="current-price"]',
+      '[class*="currentPrice"]'
+    ];
+    
+    for (const selector of selectors) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const text = el.textContent.trim();
+          const priceMatch = text.match(/(\d+\.?\d*)/);
+          if (priceMatch) {
+            const price = parseFloat(priceMatch[1]);
+            if (price > 0 && price < 100000) {
+              log('从选择器"' + selector + '"提取到价格:', price);
+              return String(price);
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    
+    log('未能提取到价格');
     return '';
   }
   
   function extractOriginalPrice() {
+    log('开始提取原价...');
+    
+    const patterns = [
+      /原价[：:]\s*[￥¥]?(\d+\.?\d*)/,
+      /划线价[：:]\s*[￥¥]?(\d+\.?\d*)/,
+      /[￥¥](\d+\.?\d*)\s*[元]?\s*(?:起)?\s*[原价|划线价]/
+    ];
+    
+    const allText = document.body.innerText;
+    
+    for (const pattern of patterns) {
+      const match = allText.match(pattern);
+      if (match) {
+        const price = parseFloat(match[1]);
+        if (price > 0 && price < 100000) {
+          log('从文本中提取到原价:', price);
+          return String(price);
+        }
+      }
+    }
+    
     const selectors = [
       '[class*="original"]',
       '[class*="Original"]',
       '[class*="line-through"]',
+      '[class*="lineThrough"]',
       '[class*="del"]',
-      'del',
-      's'
+      '[class*="old-price"]',
+      '[class*="oldPrice"]'
     ];
     
     for (const selector of selectors) {
-      const elements = document.querySelectorAll(selector);
-      for (const el of elements) {
-        const text = el.textContent.trim();
-        const priceMatch = text.match(/(\d+\.?\d*)/);
-        if (priceMatch && parseFloat(priceMatch[1]) > 0) {
-          return priceMatch[1];
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const text = el.textContent.trim();
+          const priceMatch = text.match(/(\d+\.?\d*)/);
+          if (priceMatch) {
+            const price = parseFloat(priceMatch[1]);
+            if (price > 0 && price < 100000) {
+              log('从选择器"' + selector + '"提取到原价:', price);
+              return String(price);
+            }
+          }
         }
-      }
+      } catch (e) {}
     }
     
+    log('未能提取到原价');
     return '';
   }
   
   function extractSales() {
-    const salesPatterns = [
-      /已拼(\d+)件/,
-      /已售(\d+)件/,
+    log('开始提取销量...');
+    
+    const patterns = [
+      /已拼(\d+)\s*件/,
+      /已售(\d+)\s*件/,
+      /(\d+)\s*万?\+?\s*件/,
       /销量[：:]\s*(\d+)/,
-      /(\d+)\s*件[已售]/,
-      /(\d+\.?\d*万?)\+?\s*件/
+      /(\d+\.?\d*)\s*万/,
+      /(\d+)\s*人付款/
     ];
     
-    const textContent = document.body.textContent;
+    const allText = document.body.innerText;
     
-    for (const pattern of salesPatterns) {
-      const match = textContent.match(pattern);
+    for (const pattern of patterns) {
+      const match = allText.match(pattern);
       if (match) {
         let sales = match[1];
-        if (sales.includes('万')) {
+        if (sales.includes('万') || allText.substring(match.index, match.index + 20).includes('万')) {
           sales = parseFloat(sales) * 10000;
+          sales = Math.floor(sales);
         }
+        log('从文本中提取到销量:', sales);
         return String(sales);
       }
     }
     
+    log('未能提取到销量');
     return '';
   }
   
   function extractDescription() {
+    log('开始提取商品描述...');
+    
     const selectors = [
       '[class*="desc"]',
       '[class*="Desc"]',
       '[class*="detail"]',
       '[class*="Detail"]',
-      '.description',
-      '.desc'
+      '[class*="introduction"]',
+      '[class*="Introduction"]'
     ];
     
-    let description = '';
-    
     for (const selector of selectors) {
-      const elements = document.querySelectorAll(selector);
-      for (const el of elements) {
-        const text = el.textContent.trim();
-        if (text && text.length > 20 && text.length < 2000) {
-          description = text.replace(/[\n\r\t]/g, ' ').substring(0, 500);
-          break;
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const text = el.textContent.trim();
+          if (text && text.length > 20 && text.length < 2000) {
+            const cleanText = text.replace(/[\n\r\t]/g, ' ').replace(/\s+/g, ' ');
+            if (!cleanText.includes('￥') && !cleanText.includes('¥')) {
+              log('从选择器"' + selector + '"提取到描述，长度:', cleanText.length);
+              return cleanText.substring(0, 500);
+            }
+          }
         }
-      }
-      if (description) break;
+      } catch (e) {}
     }
     
-    return description;
+    log('未能提取到商品描述');
+    return '';
   }
   
   function extractSkus() {
-    const skus = [];
+    log('开始提取SKU...');
     
-    const skuSelectors = [
+    const skus = [];
+    const skuTexts = new Set();
+    
+    const selectors = [
       '[class*="sku"]',
       '[class*="Sku"]',
       '[class*="spec"]',
       '[class*="Spec"]',
       '[class*="option"]',
-      '[class*="Option"]'
+      '[class*="Option"]',
+      '[class*="attrs"]',
+      '[class*="Attrs"]',
+      '[class*="property"]',
+      '[class*="Property"]'
     ];
     
-    const skuTexts = new Set();
-    
-    for (const selector of skuSelectors) {
-      const elements = document.querySelectorAll(selector);
-      for (const el of elements) {
-        const text = el.textContent.trim();
-        if (text && text.length > 1 && text.length < 50 && !skuTexts.has(text)) {
-          skuTexts.add(text);
-          skus.push({
-            name: text,
-            price: '',
-            stock: ''
-          });
+    for (const selector of selectors) {
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const text = el.textContent.trim();
+          if (text && text.length > 1 && text.length < 50) {
+            if (!text.includes('￥') && !text.includes('¥') && !text.includes('已拼')) {
+              if (!skuTexts.has(text)) {
+                skuTexts.add(text);
+                skus.push({
+                  name: text,
+                  price: '',
+                  stock: ''
+                });
+              }
+            }
+          }
         }
-      }
+      } catch (e) {}
     }
     
+    log('提取到' + skus.length + '个SKU');
     return skus.slice(0, 10);
   }
   
   function extractMainImage() {
+    log('开始提取主图...');
+    
     const imgSelectors = [
       '[class*="main"] img',
       '[class*="Main"] img',
-      '.goods-img img',
-      '.goods-image img',
       '[class*="goods-img"] img',
+      '[class*="goodsImg"] img',
       '[class*="goods-image"] img',
-      'img[src*="pddpic"]'
+      '[class*="goodsImage"] img',
+      '[class*="product-img"] img',
+      '[class*="productImg"] img',
+      '[class*="banner"] img',
+      '[class*="Banner"] img'
     ];
     
     for (const selector of imgSelectors) {
-      const img = document.querySelector(selector);
-      if (img && img.src) {
-        const src = img.src;
-        if (src.includes('pddpic') && !src.includes('thumb') && !src.includes('thumbnail')) {
-          return cleanImageUrl(src);
+      try {
+        const img = document.querySelector(selector);
+        if (img) {
+          const src = img.src || img.dataset.src || img.getAttribute('data-src');
+          if (src) {
+            const cleanUrl = cleanImageUrl(src);
+            if (cleanUrl && (cleanUrl.includes('pddpic') || cleanUrl.includes('pinduoduo'))) {
+              log('从选择器"' + selector + '"提取到主图:', cleanUrl.substring(0, 80));
+              return cleanUrl;
+            }
+          }
         }
-      }
+      } catch (e) {}
     }
     
     const allImages = document.querySelectorAll('img');
     for (const img of allImages) {
-      const src = img.src || img.dataset.src;
-      if (src && src.includes('pddpic')) {
-        return cleanImageUrl(src);
-      }
+      try {
+        const src = img.src || img.dataset.src || img.getAttribute('data-src');
+        if (src && (src.includes('pddpic') || src.includes('pinduoduo'))) {
+          if (!src.includes('thumb') && !src.includes('thumbnail') && !src.includes('avatar')) {
+            const cleanUrl = cleanImageUrl(src);
+            log('从页面图片中提取到主图:', cleanUrl.substring(0, 80));
+            return cleanUrl;
+          }
+        }
+      } catch (e) {}
     }
     
+    log('未能提取到主图');
     return '';
   }
   
   function extractImages() {
+    log('开始提取商品图片...');
+    
     const images = [];
     const imageUrls = new Set();
     
     const allImages = document.querySelectorAll('img');
     for (const img of allImages) {
-      const src = img.src || img.dataset.src;
-      if (src && src.includes('pddpic') && !src.includes('thumb') && !src.includes('thumbnail')) {
-        const cleanUrl = cleanImageUrl(src);
-        if (!imageUrls.has(cleanUrl)) {
-          imageUrls.add(cleanUrl);
-          images.push(cleanUrl);
+      try {
+        const src = img.src || img.dataset.src || img.getAttribute('data-src');
+        if (src && (src.includes('pddpic') || src.includes('pinduoduo'))) {
+          if (!src.includes('thumb') && !src.includes('thumbnail') && !src.includes('avatar') && !src.includes('logo')) {
+            const cleanUrl = cleanImageUrl(src);
+            if (!imageUrls.has(cleanUrl)) {
+              imageUrls.add(cleanUrl);
+              images.push(cleanUrl);
+            }
+          }
         }
-      }
+      } catch (e) {}
     }
     
+    log('提取到' + images.length + '张商品图片');
     return images.slice(0, 20);
   }
   
   function cleanImageUrl(url) {
+    if (!url) return '';
+    
     let cleanUrl = url;
     
     const sizePatterns = [
       /\?imageMogr2.*$/,
-      /\?.+$/,
+      /\?imageView2.*$/,
+      /\?.*$/,
       /\.(jpeg|jpg|png|gif|webp)\.a\.(jpeg|jpg|png|gif|webp)$/i
     ];
     
@@ -347,42 +566,150 @@
   }
   
   function extractShopName() {
+    log('开始提取店铺名称...');
+    
     const selectors = [
-      '[class*="shop"]',
-      '[class*="Shop"]',
-      '[class*="store"]',
-      '[class*="Store"]',
-      '.shop-name',
-      '.store-name'
+      '[class*="shop-name"]',
+      '[class*="shopName"]',
+      '[class*="store-name"]',
+      '[class*="storeName"]',
+      '[class*="shop-title"]',
+      '[class*="shopTitle"]'
     ];
     
     for (const selector of selectors) {
-      const elements = document.querySelectorAll(selector);
-      for (const el of elements) {
-        const text = el.textContent.trim();
-        if (text && text.length > 2 && text.length < 50 && !text.includes('收藏') && !text.includes('关注')) {
-          return text;
+      try {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          const text = el.textContent.trim();
+          if (text && text.length > 2 && text.length < 50) {
+            if (!text.includes('收藏') && !text.includes('关注') && !text.includes('客服')) {
+              if (!text.includes('￥') && !text.includes('¥')) {
+                log('从选择器"' + selector + '"提取到店铺名称:', text);
+                return text;
+              }
+            }
+          }
         }
-      }
+      } catch (e) {}
     }
     
+    log('未能提取到店铺名称');
     return '';
+  }
+  
+  function extractFromJavaScript() {
+    log('尝试从JavaScript变量中提取数据...');
+    
+    const result = {
+      productName: '',
+      price: '',
+      mainImage: '',
+      images: []
+    };
+    
+    try {
+      if (window.__INITIAL_STATE__) {
+        log('找到__INITIAL_STATE__变量');
+        const state = window.__INITIAL_STATE__;
+        if (state.goodsDetail) {
+          const detail = state.goodsDetail;
+          if (detail.goodsName) result.productName = detail.goodsName;
+          if (detail.minNormalPrice) result.price = String(detail.minNormalPrice / 100);
+          if (detail.hdThumbUrl) result.mainImage = detail.hdThumbUrl;
+        }
+      }
+      
+      if (window.goodsData) {
+        log('找到goodsData变量');
+        const data = window.goodsData;
+        if (data.goods_name) result.productName = data.goods_name;
+        if (data.min_group_price) result.price = String(data.min_group_price / 100);
+        if (data.goods_image_url) result.mainImage = data.goods_image_url;
+      }
+      
+      if (window.__NEXT_DATA__) {
+        log('找到__NEXT_DATA__变量');
+        const nextData = window.__NEXT_DATA__;
+        if (nextData.props && nextData.props.pageProps) {
+          const props = nextData.props.pageProps;
+          if (props.goodsDetail) {
+            const detail = props.goodsDetail;
+            if (detail.goodsName) result.productName = detail.goodsName;
+            if (detail.minNormalPrice) result.price = String(detail.minNormalPrice);
+          }
+        }
+      }
+      
+      const scripts = document.querySelectorAll('script');
+      for (const script of scripts) {
+        const content = script.textContent;
+        if (content && content.length > 0) {
+          const nameMatch = content.match(/goodsName["']?\s*[:=]\s*["']([^"']+)["']/);
+          if (nameMatch && !result.productName) {
+            result.productName = nameMatch[1];
+            log('从script中找到商品名称:', result.productName.substring(0, 50));
+          }
+          
+          const priceMatch = content.match(/(?:price|Price)["']?\s*[:=]\s*["']?(\d+\.?\d*)["']?/);
+          if (priceMatch && !result.price) {
+            result.price = priceMatch[1];
+            log('从script中找到价格:', result.price);
+          }
+          
+          const imgMatch = content.match(/(?:image|Image|img|Img)["']?\s*[:=]\s*["']([^"']+pddpic[^"']+)["']/);
+          if (imgMatch && !result.mainImage) {
+            result.mainImage = imgMatch[1];
+            log('从script中找到主图');
+          }
+        }
+      }
+      
+      const metaTags = document.querySelectorAll('meta[property="og:title"], meta[name="title"], meta[property="og:image"], meta[name="image"]');
+      for (const meta of metaTags) {
+        const property = meta.getAttribute('property') || meta.getAttribute('name') || '';
+        const content = meta.getAttribute('content');
+        
+        if (property.includes('title') && content && !result.productName) {
+          result.productName = content;
+          log('从meta标签找到商品名称:', content.substring(0, 50));
+        }
+        
+        if (property.includes('image') && content && !result.mainImage) {
+          if (content.includes('pddpic') || content.includes('pinduoduo')) {
+            result.mainImage = content;
+            log('从meta标签找到主图');
+          }
+        }
+      }
+      
+    } catch (e) {
+      log('从JavaScript提取数据时出错:', e);
+    }
+    
+    return result;
   }
   
   async function saveProductData(productInfo) {
     const timestamp = new Date().getTime();
+    const goodsId = productInfo.goodsId || 'unknown';
     const safeProductName = sanitizeFileName(productInfo.productName || 'product');
-    const baseName = `${productInfo.goodsId}_${safeProductName.substring(0, 30)}_${timestamp}`;
+    const shortName = safeProductName.substring(0, 20);
+    
+    const baseName = `pdd_${goodsId}_${shortName}_${timestamp}`;
+    
+    log('开始保存数据，基础文件名:', baseName);
     
     await downloadCSV(productInfo, baseName);
     
     if (productInfo.mainImage) {
-      await downloadImage(productInfo.mainImage, `${baseName}_主图`);
+      log('开始下载主图...');
+      await downloadImageViaBackground(productInfo.mainImage, `${baseName}_主图`);
     }
     
     for (let i = 0; i < productInfo.images.length && i < 5; i++) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await downloadImage(productInfo.images[i], `${baseName}_图片${i + 1}`);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await downloadImageViaBackground(productInfo.images[i], `${baseName}_图片${i + 1}`);
     }
   }
   
@@ -390,6 +717,7 @@
     return name
       .replace(/[\\/:*?"<>|]/g, '_')
       .replace(/[\r\n\t]/g, '')
+      .replace(/\s+/g, '_')
       .trim();
   }
   
@@ -415,7 +743,7 @@
         escapeCSVField(productInfo.mainImage),
         escapeCSVField(imagesText),
         escapeCSVField(productInfo.scrapedAt),
-        escapeCSVField(window.location.href)
+        escapeCSVField(productInfo.sourceUrl)
       ];
       
       const csvContent = '\uFEFF' + headers.join(',') + '\n' + row.join(',');
@@ -431,7 +759,7 @@
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      console.log('CSV已下载');
+      log('CSV文件已下载:', `${baseName}.csv`);
       resolve();
     });
   }
@@ -448,7 +776,7 @@
     return str;
   }
   
-  function downloadImage(url, name) {
+  async function downloadImageViaBackground(url, name) {
     return new Promise((resolve, reject) => {
       if (!url) {
         resolve();
@@ -458,6 +786,34 @@
       const ext = getImageExtension(url);
       const fileName = `${name}${ext}`;
       
+      log('请求下载图片:', fileName);
+      
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage(
+          {
+            action: 'downloadImage',
+            url: url,
+            filename: `pdd_goods_images/${fileName}`
+          },
+          function(response) {
+            if (response && response.success) {
+              log('图片下载请求已发送，ID:', response.downloadId);
+            } else {
+              log('通过background下载失败，尝试直接下载');
+              downloadImageDirect(url, fileName);
+            }
+            resolve();
+          }
+        );
+      } else {
+        downloadImageDirect(url, fileName);
+        resolve();
+      }
+    });
+  }
+  
+  function downloadImageDirect(url, fileName) {
+    try {
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;
@@ -466,18 +822,27 @@
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      log('直接下载图片:', fileName);
+    } catch (e) {
+      log('直接下载图片失败:', e);
       
-      console.log('图片下载请求已发送:', fileName);
-      resolve();
-    });
+      try {
+        window.open(url, '_blank');
+        log('在新标签页打开图片:', url.substring(0, 50));
+      } catch (e2) {
+        log('打开新标签页也失败:', e2);
+      }
+    }
   }
   
   function getImageExtension(url) {
-    if (url.includes('.jpeg')) return '.jpeg';
-    if (url.includes('.jpg')) return '.jpg';
-    if (url.includes('.png')) return '.png';
-    if (url.includes('.gif')) return '.gif';
-    if (url.includes('.webp')) return '.webp';
+    if (!url) return '.jpg';
+    const urlLower = url.toLowerCase();
+    if (urlLower.includes('.jpeg')) return '.jpeg';
+    if (urlLower.includes('.jpg')) return '.jpg';
+    if (urlLower.includes('.png')) return '.png';
+    if (urlLower.includes('.gif')) return '.gif';
+    if (urlLower.includes('.webp')) return '.webp';
     return '.jpg';
   }
   
@@ -488,5 +853,6 @@
   }
   
   setTimeout(init, 1000);
+  setTimeout(init, 3000);
   
 })();
